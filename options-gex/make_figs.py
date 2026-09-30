@@ -283,3 +283,128 @@ ax.set_title("圖 8　還沒調整避險前，曝險從 0 長到 500 元／點�
 thousands(ax)
 save(fig, "fig08_triangle.png")
 print("done")
+
+# ── 第 4 節以後 ──────────────────────────────────────────────
+import pandas as pd
+
+DATA = OUT / "data"
+
+
+def put_delta(S, K, days, vol=VOL):
+    T = days / 365
+    return norm.cdf((np.log(S / K) + 0.5 * vol**2 * T) / (vol * np.sqrt(T))) - 1
+
+
+# 圖9：示意選擇權鏈 → GEX 曲線（剩 7 天、IV 20%；慣例假設：造市商買進 call、賣出 put）
+chain = {19_400: (0, 4_000), 19_600: (0, 6_000), 19_800: (500, 5_000), 20_000: (3_000, 3_000),
+         20_200: (5_000, 500), 20_400: (6_000, 0), 20_600: (4_000, 0)}
+
+
+def gex_at(S, days=7):
+    return sum((c - p) * bs_gamma(S, K, days) * 0.01 * S for K, (c, p) in chain.items())
+
+
+fig, (a1, a2) = plt.subplots(2, 1, figsize=(8, 6.4), sharex=True, gridspec_kw={"height_ratios": [1, 1.3]})
+ks = np.array(list(chain))
+a1.bar(ks, [chain[k][0] for k in ks], width=140, color=BLUE)
+a1.bar(ks, [-chain[k][1] for k in ks], width=140, color=ORANGE)
+a1.axhline(0, color=INK2, lw=0.8)
+from matplotlib.patches import Patch
+a1.legend(handles=[Patch(color=BLUE, label="call 未平倉：造市商買進（＋Gamma）"),
+                   Patch(color=ORANGE, label="put 未平倉：造市商賣出（－Gamma）")],
+          loc="upper left", frameon=False, fontsize=10)
+a1.set_ylabel("未平倉（口）")
+a1.set_ylim(-6_800, 9_000)
+a1.set_title("假設的選擇權鏈（剩 7 天）", loc="left", color=INK, fontsize=11)
+xs9 = np.arange(19_000, 21_001, 20)
+gv = np.array([gex_at(x) for x in xs9])
+a2.axhspan(0, 2_000, color="#eef4fb", zorder=0)
+a2.axhspan(-2_000, 0, color="#fdf0ea", zorder=0)
+a2.plot(xs9, gv, color=INK, lw=2.2)
+a2.axhline(0, color=INK2, lw=0.8)
+a2.axvline(20_000, color=GRAY, lw=1, ls=":")
+a2.annotate("gamma flip：GEX 由負轉正\n（約 20,000）", xy=(20_000, 0), xytext=(19_020, 700), color=INK,
+            arrowprops=dict(arrowstyle="-", color=INK2, lw=0.8))
+a2.text(20_980, 650, "GEX 為正：漲了賣、跌了買\n（避險單逆著價格，壓抑波動）", ha="right", va="top", color=BLUE, fontsize=10)
+a2.text(19_020, -150, "GEX 為負：漲了買、跌了賣\n（避險單順著價格，放大波動）", va="top", color=ORANGE, fontsize=10)
+a2.set_ylim(-1_700, 1_800)
+a2.set_ylabel("GEX（每 1% 要買賣的小台口數）")
+a2.set_xlabel("指數")
+thousands(a2)
+fig.suptitle("圖 9　把每個履約價的 Gamma 加起來：指數在哪裡，造市商的避險單就往哪個方向推", x=0.01, ha="left", color=INK)
+save(fig, "fig09_gex_curve.png")
+
+# 圖10：三大法人選擇權淨未平倉（真實資料，2026-07～09）
+io = pd.read_csv(DATA / "txo_institutional_oi_2026Q3.csv", parse_dates=["date"])
+fig, axes = plt.subplots(1, 2, figsize=(10, 3.9), sharey=True)
+for ax, cp in zip(axes, ("買權", "賣權")):
+    for who, c in (("自營商", BLUE), ("外資", ORANGE), ("投信", AQUA)):
+        s = io[(io.call_put == cp) & (io.institutional_investors == who)].set_index("date").net
+        ax.plot(s.index, s.values, color=c, lw=1.8, label=who)
+        ax.text(s.index[-1], s.values[-1], f" {who}", color=c, fontsize=10, va="center")
+    ax.axhline(0, color=INK2, lw=0.8)
+    ax.set_title(f"{'call' if cp == '買權' else 'put'}：淨未平倉（買方 − 賣方，口）", loc="left", color=INK, fontsize=11)
+    ax.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%m/%d"))
+    thousands(ax, "y")
+axes[0].text(0.02, 0.04, "0 以上＝淨買進（持有＋Gamma）\n0 以下＝淨賣出（持有－Gamma）", transform=axes[0].transAxes, color=INK2, fontsize=9)
+fig.suptitle("圖 10　臺指選擇權三大法人淨部位（2026/7–9/30）：自營商大多是淨買進，不是淨賣出", x=0.01, ha="left", color=INK)
+fig.tight_layout()
+fig.subplots_adjust(right=0.94)
+fig.savefig(OUT / "fig10_institutional.png", dpi=200)
+plt.close(fig)
+
+# 圖11：價格不動，避險量也會變（charm：時間；vanna：IV）
+dd = np.linspace(30, 0.2, 300)
+fig, ax = plt.subplots(figsize=(7, 3.9))
+for v, c, lab in ((0.25, ORANGE, "IV 25%"), (0.20, BLUE, "IV 20%"), (0.15, AQUA, "IV 15%")):
+    y = -1000 * np.array([put_delta(20_000, 19_500, d, v) for d in dd])
+    ax.plot(dd, y, color=c, lw=2)
+    ax.text(12, np.interp(12, dd[::-1], y[::-1]) + 8, lab, color=c, fontsize=10)
+for d in (30, 7, 1):
+    y = -1000 * put_delta(20_000, 19_500, d)
+    ax.plot([d], [y], "o", color=BLUE, ms=6, mec="#ffffff", mew=1.5, zorder=5)
+    ax.text(d - 0.4, y - 32 if d == 30 else y + 14, f"剩 {d} 天：{y:.0f} 口", color=BLUE, fontsize=10)
+ax.invert_xaxis()
+ax.set_xlabel("剩餘天數（指數一直停在 20,000）")
+ax.set_ylabel("造市商需要放空的小台（口）")
+ax.set_title("圖 11　賣出 1,000 口 19,500 put：價格沒動，避險量也會自己變小", loc="left", color=INK)
+ax.set_ylim(0, 420)
+save(fig, "fig11_charm_vanna.png")
+
+# 圖12：真實 9/30 收盤的 Gamma 分布與規模（真實資料）
+gb = pd.read_csv(DATA / "txo_gamma_by_strike_20260930.csv")
+gb = gb[(gb.strike >= 42_000) & (gb.strike <= 54_000)]
+ch = pd.read_csv(DATA / "txo_chain_20260930.csv")
+fig, (a1, a2) = plt.subplots(1, 2, figsize=(10, 4.0), gridspec_kw={"width_ratios": [1.5, 1]})
+a1.bar(gb.strike, gb.call_gamma_1pct, width=80, color=BLUE)
+a1.bar(gb.strike, -gb.put_gamma_1pct, width=80, color=ORANGE)
+a1.axhline(0, color=INK2, lw=0.8)
+a1.axvline(47_940, color=INK2, lw=1, ls="--")
+a1.text(47_850, a1.get_ylim()[1] * 0.93, "加權指數 47,940", color=INK2, fontsize=10, ha="right")
+a1.text(42_100, a1.get_ylim()[1] * 0.75, "call 的 Gamma", color=BLUE, fontsize=10)
+a1.text(42_100, a1.get_ylim()[0] * 0.8, "put 的 Gamma", color=ORANGE, fontsize=10)
+a1.set_xlabel("履約價")
+a1.set_ylabel("每 1% 對應的小台口數")
+a1.set_title("每個履約價的 Gamma（所有到期合計）", loc="left", color=INK, fontsize=11)
+thousands(a1)
+shifts = np.linspace(-0.06, 0.04, 41)
+conv = []
+for sh in shifts:
+    F2 = ch.F * (1 + sh)
+    T = ch["T"]
+    d1_ = (np.log(F2 / ch.K) + 0.5 * ch.iv**2 * T) / (ch.iv * np.sqrt(T))
+    g = norm.pdf(d1_) / (F2 * ch.iv * np.sqrt(T)) * 0.01 * F2 * ch.oi
+    conv.append(g[ch.cp == "call"].sum() - g[ch.cp == "put"].sum())
+a2.axhline(0, color=INK2, lw=0.8)
+a2.plot(shifts * 100, conv, color=INK, lw=2)
+a2.axvline(0, color=GRAY, lw=1, ls=":")
+a2.set_xlabel("指數相對 9/30 收盤變動（%）")
+a2.set_ylabel("慣例假設下的 GEX（小台口數）")
+a2.set_title("若照美股慣例假設對手方", loc="left", color=INK, fontsize=11)
+thousands(a2, "y")
+fig.suptitle("圖 12　真實資料（2026/9/30 收盤）：全部 Gamma 合計每 1% 約 5,400 口小台，日盤期貨成交約 30 萬口",
+             x=0.01, ha="left", color=INK)
+fig.tight_layout()
+fig.savefig(OUT / "fig12_real_gamma.png", dpi=200)
+plt.close(fig)
+print("done 9-12")
