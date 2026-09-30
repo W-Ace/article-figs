@@ -120,34 +120,45 @@ ax.set_ylim(0, 500)
 thousands(ax)
 save(fig, "fig03_time_value.png")
 
-# 圖3：結局分布，Delta＝K 右邊面積、Gamma＝K 處高度
-days, k3 = 30, 20_500
-sd = VOL * np.sqrt(days / 365)
-x = np.linspace(16_000, 23_500, 1_501)
-dens = norm.pdf(np.log(x / S0) + 0.5 * sd**2, scale=sd) / x  # 對數常態（r=0）
-fig, ax = plt.subplots(figsize=(7, 3.8))
-ax.plot(x, dens, color=INK2, lw=1.5)
-right = x >= k3
-ax.fill_between(x[right], dens[right], color=BLUE, alpha=0.25, lw=0)
-strip = (x >= k3 - 100) & (x <= k3)
-ax.fill_between(x[strip], dens[strip], color=ORANGE, alpha=0.85, lw=0)
-ax.axvline(S0, color=GRAY, lw=1, ls=":")
-ax.text(S0 - 60, dens.max() * 1.05, "現價 20,000", color=INK2, ha="right")
-ax.set_ylim(0, dens.max() * 1.15)
-p_above = 1 - norm.cdf(np.log(k3 / S0) + 0.5 * sd**2, scale=sd)
-ax.annotate(f"藍色面積＝結局落在 K 之上的機率\n≈ call 的 Delta（這裡約 {p_above:.2f}）",
-            xy=(21_300, dens[np.searchsorted(x, 21_300)] * 0.5), xytext=(21_700, dens.max() * 0.75),
-            color=BLUE, arrowprops=dict(arrowstyle="-", color=BLUE, lw=0.8))
-ax.annotate("橘色：K 下方 100 點內\n的結局，標的上移 100\n點就跨過 K。Gamma\n看的就是 K 這裡的高度",
-            xy=(k3 - 50, dens[np.searchsorted(x, k3 - 50)] * 0.85), xytext=(16_050, dens.max() * 0.5),
-            color=ORANGE, arrowprops=dict(arrowstyle="-", color=ORANGE, lw=0.8))
-ax.text(k3 + 30, dens.max() * 0.93, "K＝20,500", color=INK2)
-ax.axvline(k3, color=GRAY, lw=1, ls=":")
-ax.set_yticks([])
-ax.set_xlabel("到期結算價（剩 30 天、年化波動 20%）")
-ax.set_ylabel("可能性")
-ax.set_title("圖 4　結局分布：Delta 是 K 右邊的面積，Gamma 是 K 處的高度", loc="left", color=INK)
-thousands(ax)
+# 圖4：1,000 個世界的結局（現價 19,900、K＝20,000）；指數漲 100 點時哪些世界跨過 K
+s_now, k4, n_worlds, w = 19_900, 20_000, 1_000, 100
+edges = np.arange(16_800, 23_000 + w, w)
+
+
+def p_below(x, days):  # 結算價低於 x 的機率（現價 s_now，r=0 對數常態）
+    sd = VOL * np.sqrt(days / 365)
+    return norm.cdf((np.log(x / s_now) + 0.5 * sd**2) / sd)
+
+
+fig, axes = plt.subplots(2, 1, figsize=(8, 6.2), sharex=True, sharey=True)
+for ax, days in zip(axes, (30, 1)):
+    counts = n_worlds * np.diff(p_below(edges, days))
+    colors = [ORANGE if lo == s_now else BLUE if lo >= k4 else "#c9c8c2" for lo in edges[:-1]]
+    ax.bar(edges[:-1], counts, width=w * 0.9, align="edge", color=colors, lw=0)
+    above = n_worlds * (1 - p_below(k4, days))
+    band = n_worlds * (p_below(k4, days) - p_below(s_now, days))
+    ax.axvline(k4, color=INK2, lw=1, ls=":")
+    ax.text(0.01, 0.93, f"剩 {days} 天", transform=ax.transAxes, color=INK, fontsize=13, va="top")
+    tx, ha = 0.99, "right"
+    ax.text(tx, 0.93 if days == 30 else 0.78,
+            f"藍色：已在 K 之上的世界 {above:.0f} 個 → Delta {above / 10:.1f}%\n"
+            f"橘色：落在 19,900–20,000 的世界 {band:.0f} 個\n"
+            f"指數漲 100 點，橘色全部跨過 K：\n"
+            f"{above:.0f} ＋ {band:.0f} ＝ {above + band:.0f} 個 → Delta {(above + band) / 10:.1f}%",
+            transform=ax.transAxes, ha=ha, va="top", color=INK2, linespacing=1.5, fontsize=10)
+    ax.annotate(f"{band:.0f} 個", xy=(s_now + w * 0.45, band), xytext=(s_now - 900, band + 25),
+                color=ORANGE, arrowprops=dict(arrowstyle="-", color=ORANGE, lw=0.8))
+    ax.set_ylabel("世界數（每 100 點一格）")
+axes[0].text(k4 + 40, 80, "K＝20,000", color=INK2)
+axes[0].text(s_now - 40, 80, "現價 19,900", color=INK2, ha="right")
+axes[0].axvline(s_now, color=GRAY, lw=1, ls="--")
+axes[1].axvline(s_now, color=GRAY, lw=1, ls="--")
+axes[0].set_ylim(0, 200)
+axes[1].set_xlabel("到期結算價")
+axes[1].set_xlim(16_800, 23_000)
+thousands(axes[1])
+fig.suptitle("圖 4　1,000 個世界的結局：橘色那格越高，指數一動 Delta 就變越多（＝Gamma 越大）",
+             x=0.01, ha="left", color=INK)
 save(fig, "fig04_outcomes.png")
 
 # 圖4：Gamma 對履約價（左：到期時間；右：波動率）
