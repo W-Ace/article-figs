@@ -102,6 +102,24 @@ ax.set_ylim(-20, 1_000)
 thousands(ax)
 save(fig, "fig02_value_curves.png")
 
+# 圖3：時間價值對現價（同一張 K＝20,000 的 call，剩 30／7／1 天）
+fig, ax = plt.subplots(figsize=(7, 3.8))
+for days, c, lx, tx, ty in [(30, BLUE, 20_700, 20_780, 330), (7, ORANGE, 20_250, 20_420, 200), (1, AQUA, 20_060, 20_180, 95)]:
+    tv = bs_call(s, K, days) - np.maximum(s - K, 0)
+    ax.plot(s, tv, color=c, lw=2)
+    ly = bs_call(np.array([lx]), K, days)[0] - max(lx - K, 0)
+    ax.annotate(f"剩 {days} 天", xy=(lx, ly), xytext=(tx, ty), color=c,
+                arrowprops=dict(arrowstyle="-", color=c, lw=0.8))
+ax.axvline(K, color=GRAY, lw=1, ls=":")
+ax.text(K - 30, 480, "K＝20,000", color=INK2, ha="right")
+ax.set_xlabel("現價（今天的指數）")
+ax.set_ylabel("時間價值（點）")
+ax.set_title("圖 3　時間價值在 K 最大，往兩邊變小；越接近到期越集中在 K", loc="left", color=INK)
+ax.set_xlim(19_000, 21_000)
+ax.set_ylim(0, 500)
+thousands(ax)
+save(fig, "fig03_time_value.png")
+
 # 圖3：結局分布，Delta＝K 右邊面積、Gamma＝K 處高度
 days, k3 = 30, 20_500
 sd = VOL * np.sqrt(days / 365)
@@ -128,9 +146,9 @@ ax.axvline(k3, color=GRAY, lw=1, ls=":")
 ax.set_yticks([])
 ax.set_xlabel("到期結算價（剩 30 天、年化波動 20%）")
 ax.set_ylabel("可能性")
-ax.set_title("圖 3　結局分布：Delta 是 K 右邊的面積，Gamma 是 K 處的高度", loc="left", color=INK)
+ax.set_title("圖 4　結局分布：Delta 是 K 右邊的面積，Gamma 是 K 處的高度", loc="left", color=INK)
 thousands(ax)
-save(fig, "fig03_outcomes.png")
+save(fig, "fig04_outcomes.png")
 
 # 圖4：Gamma 對履約價（左：到期時間；右：波動率）
 ks = np.linspace(18_500, 21_500, 601)
@@ -154,8 +172,8 @@ for a in (a1, a2):
     a.set_xlabel("履約價（現價 20,000）")
     thousands(a)
 a1.set_ylabel("Gamma（每 1,000 點 Delta 變多少）")
-fig.suptitle("圖 4　每個履約價的 Gamma：以現價為中心的一個鼓包", x=0.01, ha="left", color=INK)
-save(fig, "fig04_gamma_by_strike.png")
+fig.suptitle("圖 5　每個履約價的 Gamma：以現價為中心的一個鼓包", x=0.01, ha="left", color=INK)
+save(fig, "fig05_gamma_by_strike.png")
 
 # 圖5：負 Gamma 避險虧損＝三角形面積
 fig, ax = plt.subplots(figsize=(7, 3.6))
@@ -170,7 +188,7 @@ ax.set_xlim(19_990, 20_230)
 ax.set_ylim(0, 560)
 ax.set_xlabel("指數")
 ax.set_ylabel("淨空頭曝險（元／點）")
-ax.set_title("圖 5　還沒調整避險前，曝險從 0 長到 500 元／點：虧損是三角形面積", loc="left", color=INK)
+ax.set_title("圖 6　還沒調整避險前，曝險從 0 長到 500 元／點：虧損是三角形面積", loc="left", color=INK)
 thousands(ax)
-save(fig, "fig05_triangle.png")
+save(fig, "fig06_triangle.png")
 print("done")
