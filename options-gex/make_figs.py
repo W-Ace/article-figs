@@ -238,11 +238,11 @@ sd6 = VOL * np.sqrt(days6 / 365)
 xs6 = np.linspace(18_000, 22_000, 801)
 p_above6 = lambda x: 1 - norm.cdf((np.log(k6 / x) + 0.5 * sd6**2) / sd6)  # 結局落在 K 之上的機率
 
-fig, axes = plt.subplots(1, 2, figsize=(10, 5.4), sharey=True)
+fig, axes = plt.subplots(1, 2, figsize=(10, 6.0), sharey=True)
 panels = [
-    (axes[0], "賣方：Delta 隨指數往下走 → 負 Gamma", "down",
+    (axes[0], "賣方：指數越高，Delta 越小\n線往右下斜 → 負 Gamma", "down",
      [("賣 put", 1 - p_above6(xs6), BLUE, (18_150, 78)), ("賣 call", -p_above6(xs6), ORANGE, (18_150, -26))]),
-    (axes[1], "買方：Delta 隨指數往上走 → 正 Gamma", "up",
+    (axes[1], "買方：指數越高，Delta 越大\n線往右上斜 → 正 Gamma", "up",
      [("買 call", p_above6(xs6), BLUE, (18_150, 16)), ("買 put", p_above6(xs6) - 1, ORANGE, (18_150, -84))]),
 ]
 for ax, title, way, lines in panels:
@@ -263,18 +263,23 @@ for ax, title, way, lines in panels:
         ax.text(lx, ly, name, color=c, fontsize=12)
         moves.append(f"{name}：{vals[0]:+.0f}% → {vals[1]:+.0f}%（{vals[1] - vals[0]:+.0f}）")
     word = "往下掉" if way == "down" else "往上升"
-    ax.text(0, -0.25, "指數 19,900 → 20,900：\n" + "；".join(moves) + f"\n→ 兩條線{word}一樣多",
+    ax.text(0, -0.40, "指數 19,900 → 20,900：\n" + "；".join(moves) + f"\n→ 兩條線{word}一樣多",
             transform=ax.transAxes, color=INK, fontsize=10, va="top", linespacing=1.6)
     ax.set_title(title, loc="left", color=INK)
-    ax.set_xlabel("指數（K＝20,000，剩 30 天）")
+    ax.set_xlabel("指數（K＝20,000，剩 30 天）\n← 低於 K：put 價內、call 價外　｜　高於 K：put 價外、call 價內 →", fontsize=10)
     ax.set_xlim(18_000, 22_000)
     ax.set_xticks(range(18_000, 22_001, 1_000))
     ax.set_ylim(-105, 105)
     thousands(ax)
 axes[0].set_ylabel("Delta＝速度（每漲 1 點賺賠幾點，%）")
-fig.suptitle("圖 6　Delta 是速度、Gamma 是加速度：看線往上還是往下走，不是看在 0 的哪一邊",
+fig.suptitle("圖 6　Delta＝線的高度（速度），Gamma＝線的斜率（加速度）",
              x=0.01, ha="left", color=INK)
-fig.text(0.01, 0.915, "藍底：Delta 為正（多頭，漲會賺）　橘底：Delta 為負（空頭，漲會賠）", color=INK2, fontsize=10)
+fig.text(0.01, 0.915, "藍底：Delta 為正（多頭，漲會賺）　橘底：Delta 為負（空頭，漲會賠）　正負號看高度，Gamma 看斜率", color=INK2, fontsize=10)
+for ax, name, y, lab, ty in ((axes[0], "賣 put", 1 - p_above6(xs6), "斜率＝Gamma\n往下斜＝負", 62), (axes[1], "買 call", p_above6(xs6), "斜率＝Gamma\n往上斜＝正", 40)):
+    y0, y1 = np.interp(19_900, xs6, y) * 100, np.interp(20_900, xs6, y) * 100
+    ax.annotate("", xy=(20_900, y1), xytext=(19_900, y0),
+                arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.6, shrinkA=6, shrinkB=6))
+    ax.text(21_050, ty, lab, color=INK, fontsize=10, va="center")
 fig.tight_layout(rect=(0, 0.02, 1, 0.92))
 fig.savefig(OUT / "fig06_delta_speed.png", dpi=200, bbox_inches="tight", pad_inches=0.15)
 plt.close(fig)
