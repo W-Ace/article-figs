@@ -161,6 +161,39 @@ fig.suptitle("圖 4　1,000 個世界的結局：橘色那格越高，指數一�
              x=0.01, ha="left", color=INK)
 save(fig, "fig04_outcomes.png")
 
+# 圖5：賣出 put 的損益（現價 19,900、K＝20,000、剩 30 天、權利金約 508 點；指數瞬間移動）
+def bs_put(s_, k, days, vol=VOL):
+    return bs_call(s_, k, days, vol) - s_ + k  # r=0 買賣權平價
+
+
+s5, k5 = 19_900, 20_000
+prem = bs_put(np.array([s5]), k5, 30)[0]
+xs = np.linspace(18_000, 22_000, 801)
+pnl = prem - bs_put(xs, k5, 30)
+fig, ax = plt.subplots(figsize=(7, 4.2))
+ax.axhline(0, color=INK2, lw=0.8)
+ax.axhline(prem, color=GRAY, lw=1, ls="--")
+ax.text(18_050, prem + 25, f"賺的上限＝收到的權利金 {prem:.0f} 點", color=INK2)
+ax.plot(xs, pnl, color=ORANGE, lw=2.2)
+for xm in (s5 - 1_000, s5 + 1_000):
+    ym = prem - bs_put(np.array([xm]), k5, 30)[0]
+    ax.plot([xm], [ym], "o", color=ORANGE, ms=7, mec="#ffffff", mew=1.5, zorder=5)
+    ax.annotate(f"{'往上' if xm > s5 else '往下'} 1,000 點：{ym:+.0f} 點", xy=(xm, ym),
+                xytext=(xm + 80, ym + (-230 if xm > s5 else -60)),
+                color=INK, arrowprops=dict(arrowstyle="-", color=INK2, lw=0.8))
+ax.plot([s5], [0], "o", color=INK, ms=6, zorder=5)
+ax.annotate("賣出時：指數 19,900", xy=(s5, 0), xytext=(s5 + 120, -260), color=INK2,
+            arrowprops=dict(arrowstyle="-", color=INK2, lw=0.8))
+ax.text(18_700, -1_420, "左邊越來越陡：\n越跌，多頭曝險越大，賠得越快", color=ORANGE)
+ax.text(20_550, -520, "右邊越來越平：\n越漲，多頭曝險越小，賺得越慢", color=ORANGE)
+ax.set_xlim(18_000, 22_000)
+ax.set_ylim(-1_550, 700)
+ax.set_xlabel("指數（瞬間移動，時間沒有經過）")
+ax.set_ylabel("賣方損益（點）")
+ax.set_title("圖 5　賣出 put 的損益：往上賺得越來越慢，往下賠得越來越快", loc="left", color=INK)
+thousands(ax)
+save(fig, "fig05_short_put.png")
+
 # 圖4：Gamma 對履約價（左：到期時間；右：波動率）
 ks = np.linspace(18_500, 21_500, 601)
 fig, (a1, a2) = plt.subplots(1, 2, figsize=(9, 3.8), sharey=False)
@@ -183,8 +216,8 @@ for a in (a1, a2):
     a.set_xlabel("履約價（現價 20,000）")
     thousands(a)
 a1.set_ylabel("Gamma（每 1,000 點 Delta 變多少）")
-fig.suptitle("圖 5　每個履約價的 Gamma：以現價為中心的一個鼓包", x=0.01, ha="left", color=INK)
-save(fig, "fig05_gamma_by_strike.png")
+fig.suptitle("圖 6　每個履約價的 Gamma：以現價為中心的一個鼓包", x=0.01, ha="left", color=INK)
+save(fig, "fig06_gamma_by_strike.png")
 
 # 圖5：負 Gamma 避險虧損＝三角形面積
 fig, ax = plt.subplots(figsize=(7, 3.6))
@@ -199,7 +232,7 @@ ax.set_xlim(19_990, 20_230)
 ax.set_ylim(0, 560)
 ax.set_xlabel("指數")
 ax.set_ylabel("淨空頭曝險（元／點）")
-ax.set_title("圖 6　還沒調整避險前，曝險從 0 長到 500 元／點：虧損是三角形面積", loc="left", color=INK)
+ax.set_title("圖 7　還沒調整避險前，曝險從 0 長到 500 元／點：虧損是三角形面積", loc="left", color=INK)
 thousands(ax)
-save(fig, "fig06_triangle.png")
+save(fig, "fig07_triangle.png")
 print("done")
