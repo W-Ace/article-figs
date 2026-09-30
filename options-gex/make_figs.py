@@ -194,6 +194,53 @@ ax.set_title("圖 5　賣出 put 的損益：往上賺得越來越慢，往下�
 thousands(ax)
 save(fig, "fig05_short_put.png")
 
+# 圖6：Delta＝速度、Gamma＝加速度；賣方／買方四條 Delta 線（K＝20,000、剩 30 天）
+k6, days6 = 20_000, 30
+sd6 = VOL * np.sqrt(days6 / 365)
+xs6 = np.linspace(18_000, 22_000, 801)
+p_above6 = lambda x: 1 - norm.cdf((np.log(k6 / x) + 0.5 * sd6**2) / sd6)  # 結局落在 K 之上的機率
+
+fig, axes = plt.subplots(1, 2, figsize=(10, 5.4), sharey=True)
+panels = [
+    (axes[0], "賣方：Delta 隨指數往下走 → 負 Gamma", "down",
+     [("賣 put", 1 - p_above6(xs6), BLUE, (18_150, 78)), ("賣 call", -p_above6(xs6), ORANGE, (18_150, -26))]),
+    (axes[1], "買方：Delta 隨指數往上走 → 正 Gamma", "up",
+     [("買 call", p_above6(xs6), BLUE, (18_150, 16)), ("買 put", p_above6(xs6) - 1, ORANGE, (18_150, -84))]),
+]
+for ax, title, way, lines in panels:
+    ax.axhspan(0, 105, color="#eef4fb", zorder=0)
+    ax.axhspan(-105, 0, color="#fdf0ea", zorder=0)
+    ax.axhline(0, color=INK2, lw=0.8)
+    ax.axvline(k6, color=GRAY, lw=1, ls=":")
+    moves = []
+    for name, y, c, (lx, ly) in lines:
+        ax.plot(xs6, y * 100, color=c, lw=2.2)
+        vals = []
+        for x0 in (19_900, 20_900):
+            y0 = np.interp(x0, xs6, y) * 100
+            vals.append(y0)
+            ax.plot([x0], [y0], "o", color=c, ms=6, mec="#ffffff", mew=1.5, zorder=5)
+            dx, ha = (70, "left") if way == "down" else (-70, "right")
+            ax.text(x0 + dx, y0 + 5, f"{y0:+.0f}%", color=c, fontsize=10, ha=ha)
+        ax.text(lx, ly, name, color=c, fontsize=12)
+        moves.append(f"{name}：{vals[0]:+.0f}% → {vals[1]:+.0f}%（{vals[1] - vals[0]:+.0f}）")
+    word = "往下掉" if way == "down" else "往上升"
+    ax.text(0, -0.25, "指數 19,900 → 20,900：\n" + "；".join(moves) + f"\n→ 兩條線{word}一樣多",
+            transform=ax.transAxes, color=INK, fontsize=10, va="top", linespacing=1.6)
+    ax.set_title(title, loc="left", color=INK)
+    ax.set_xlabel("指數（K＝20,000，剩 30 天）")
+    ax.set_xlim(18_000, 22_000)
+    ax.set_xticks(range(18_000, 22_001, 1_000))
+    ax.set_ylim(-105, 105)
+    thousands(ax)
+axes[0].set_ylabel("Delta＝速度（每漲 1 點賺賠幾點，%）")
+fig.suptitle("圖 6　Delta 是速度、Gamma 是加速度：看線往上還是往下走，不是看在 0 的哪一邊",
+             x=0.01, ha="left", color=INK)
+fig.text(0.01, 0.915, "藍底：Delta 為正（多頭，漲會賺）　橘底：Delta 為負（空頭，漲會賠）", color=INK2, fontsize=10)
+fig.tight_layout(rect=(0, 0.02, 1, 0.92))
+fig.savefig(OUT / "fig06_delta_speed.png", dpi=200, bbox_inches="tight", pad_inches=0.15)
+plt.close(fig)
+
 # 圖4：Gamma 對履約價（左：到期時間；右：波動率）
 ks = np.linspace(18_500, 21_500, 601)
 fig, (a1, a2) = plt.subplots(1, 2, figsize=(9, 3.8), sharey=False)
@@ -216,8 +263,8 @@ for a in (a1, a2):
     a.set_xlabel("履約價（現價 20,000）")
     thousands(a)
 a1.set_ylabel("Gamma（每 1,000 點 Delta 變多少）")
-fig.suptitle("圖 6　每個履約價的 Gamma：以現價為中心的一個鼓包", x=0.01, ha="left", color=INK)
-save(fig, "fig06_gamma_by_strike.png")
+fig.suptitle("圖 7　每個履約價的 Gamma：以現價為中心的一個鼓包", x=0.01, ha="left", color=INK)
+save(fig, "fig07_gamma_by_strike.png")
 
 # 圖5：負 Gamma 避險虧損＝三角形面積
 fig, ax = plt.subplots(figsize=(7, 3.6))
@@ -232,7 +279,7 @@ ax.set_xlim(19_990, 20_230)
 ax.set_ylim(0, 560)
 ax.set_xlabel("指數")
 ax.set_ylabel("淨空頭曝險（元／點）")
-ax.set_title("圖 7　還沒調整避險前，曝險從 0 長到 500 元／點：虧損是三角形面積", loc="left", color=INK)
+ax.set_title("圖 8　還沒調整避險前，曝險從 0 長到 500 元／點：虧損是三角形面積", loc="left", color=INK)
 thousands(ax)
-save(fig, "fig07_triangle.png")
+save(fig, "fig08_triangle.png")
 print("done")
