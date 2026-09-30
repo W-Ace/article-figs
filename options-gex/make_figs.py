@@ -170,28 +170,66 @@ s5, k5 = 19_900, 20_000
 prem = bs_put(np.array([s5]), k5, 30)[0]
 xs = np.linspace(18_000, 22_000, 801)
 pnl = prem - bs_put(xs, k5, 30)
-fig, ax = plt.subplots(figsize=(7, 4.2))
-ax.axhline(0, color=INK2, lw=0.8)
-ax.axhline(prem, color=GRAY, lw=1, ls="--")
-ax.text(18_050, prem + 25, f"賺的上限＝收到的權利金 {prem:.0f} 點", color=INK2)
-ax.plot(xs, pnl, color=ORANGE, lw=2.2)
-for xm in (s5 - 1_000, s5 + 1_000):
+sd5 = VOL * np.sqrt(30 / 365)
+p_below5 = lambda x: norm.cdf((np.log(k5 / x) + 0.5 * sd5**2) / sd5)  # 結局落在 K 之下的機率＝賣方 Delta
+dlt = p_below5(xs) * 100                      # 賣方 Delta（%）
+gam = np.gradient(dlt, xs) * 100              # 指數每漲 100 點，Delta 變幾個百分點
+marks = (s5 - 1_000, s5, s5 + 1_000)
+fig, (a1, a2, a3) = plt.subplots(3, 1, figsize=(7.2, 8.6), sharex=True,
+                                 gridspec_kw={"height_ratios": [1.25, 1, 1]})
+for ax in (a1, a2, a3):
+    for xm in marks:
+        ax.axvline(xm, color=GRAY, lw=0.9, ls=":")
+    ax.axvline(k5, color=INK2, lw=0.8, ls="--")
+# ① 損益
+a1.axhline(0, color=INK2, lw=0.8)
+a1.axhline(prem, color=GRAY, lw=1, ls="--")
+a1.text(18_050, prem + 30, f"賺的上限＝收到的權利金 {prem:.0f} 點", color=INK2, fontsize=10)
+a1.plot(xs, pnl, color=ORANGE, lw=2.2)
+for xm in marks:
     ym = prem - bs_put(np.array([xm]), k5, 30)[0]
-    ax.plot([xm], [ym], "o", color=ORANGE, ms=7, mec="#ffffff", mew=1.5, zorder=5)
-    ax.annotate(f"{'往上' if xm > s5 else '往下'} 1,000 點：{ym:+.0f} 點", xy=(xm, ym),
-                xytext=(xm + 80, ym + (-230 if xm > s5 else -60)),
-                color=INK, arrowprops=dict(arrowstyle="-", color=INK2, lw=0.8))
-ax.plot([s5], [0], "o", color=INK, ms=6, zorder=5)
-ax.annotate("賣出時：指數 19,900", xy=(s5, 0), xytext=(s5 + 120, -260), color=INK2,
-            arrowprops=dict(arrowstyle="-", color=INK2, lw=0.8))
-ax.text(18_700, -1_420, "左邊越來越陡：\n越跌，多頭曝險越大，賠得越快", color=ORANGE)
-ax.text(20_550, -520, "右邊越來越平：\n越漲，多頭曝險越小，賺得越慢", color=ORANGE)
-ax.set_xlim(18_000, 22_000)
-ax.set_ylim(-1_550, 700)
-ax.set_xlabel("指數（瞬間移動，時間沒有經過）")
-ax.set_ylabel("賣方損益（點）")
-ax.set_title("圖 5　賣出 put 的損益：往上賺得越來越慢，往下賠得越來越快", loc="left", color=INK)
-thousands(ax)
+    a1.plot([xm], [ym], "o", color=ORANGE, ms=6, mec="#ffffff", mew=1.5, zorder=5)
+    a1.text(xm + 60, ym - 150 if xm != s5 else ym - 170, f"{ym:+.0f} 點" if xm != s5 else "賣出時（指數 19,900）", color=INK, fontsize=10)
+a1.text(20_050, -1_300, "K＝20,000", color=INK2, fontsize=9)
+a1.set_ylim(-1_550, 700)
+a1.set_ylabel("① 賣方損益（點）")
+a1.set_title("① 損益：往上賺得越來越慢，往下賠得越來越快", loc="left", color=INK, fontsize=11)
+# ② Delta：put 本身（買方）與賣方，正負號相反
+a2.axhline(0, color=INK2, lw=0.8)
+a2.plot(xs, -dlt, color=GRAY, lw=1.8, ls="--")
+a2.plot(xs, dlt, color=BLUE, lw=2.2)
+for xm in marks:
+    ym = float(np.interp(xm, xs, dlt))
+    a2.plot([xm], [ym], "o", color=BLUE, ms=6, mec="#ffffff", mew=1.5, zorder=5)
+    a2.text(xm + 60, ym + 6, f"+{ym:.0f}%", color=BLUE, fontsize=10)
+    a2.plot([xm], [-ym], "o", color=GRAY, ms=5, zorder=5)
+    a2.text(xm + 60, -ym - 14, f"−{ym:.0f}%", color=GRAY, fontsize=10)
+a2.text(21_950, 95, "賣方的 Delta（正的：他是多頭）", ha="right", va="top", color=BLUE, fontsize=10)
+a2.text(21_950, -80, "put 本身（買方）的 Delta（負的）", ha="right", va="bottom", color=GRAY, fontsize=10)
+a2.set_ylim(-105, 105)
+a2.set_ylabel("② Delta（%）")
+a2.set_title("② Delta＝速度：賣方剛好是 put 本身的相反數", loc="left", color=INK, fontsize=11)
+# ③ Gamma：買方正、賣方負
+a3.axhline(0, color=INK2, lw=0.8)
+a3.plot(xs, -gam, color=GRAY, lw=1.8, ls="--")
+a3.fill_between(xs, gam, 0, color=ORANGE, alpha=0.18, lw=0)
+a3.plot(xs, gam, color=ORANGE, lw=2.2)
+for xm in marks:
+    ym = float(np.interp(xm, xs, gam))
+    a3.plot([xm], [ym], "o", color=ORANGE, ms=6, mec="#ffffff", mew=1.5, zorder=5)
+    a3.text(xm - 70 if xm < s5 else xm + 110, ym + (0.45 if xm > s5 else -0.6), f"{ym:.1f}", color=ORANGE, fontsize=10,
+            ha="right" if xm < s5 else "left")
+a3.text(21_950, 4.3, "買方的 Gamma（正的）", ha="right", va="top", color=GRAY, fontsize=10)
+a3.text(21_950, -3.2, "賣方的 Gamma（負的）\n在 K 附近最負", ha="right", va="top", color=ORANGE, fontsize=10)
+a3.text(18_060, 4.3, "Gamma＝加速度：指數每漲 100 點，\nDelta 變幾個百分點", va="top", color=INK2, fontsize=9.5)
+a3.set_ylim(-4.8, 4.8)
+a3.set_ylabel("③ Gamma")
+a3.set_title("③ Gamma＝加速度：賣方一直是負的，買方一直是正的", loc="left", color=INK, fontsize=11)
+a3.set_xlabel("指數（瞬間移動，時間沒有經過；虛線＝K，點線＝19,900 與上下 1,000 點）")
+a3.set_xlim(18_000, 22_000)
+thousands(a3)
+fig.suptitle("圖 5　賣出 put（K＝20,000、剩 30 天）：損益、Delta、Gamma 放在同一條橫軸",
+             x=0.01, ha="left", color=INK)
 save(fig, "fig05_short_put.png")
 
 # 圖6：Delta＝速度、Gamma＝加速度；賣方／買方四條 Delta 線（K＝20,000、剩 30 天）
