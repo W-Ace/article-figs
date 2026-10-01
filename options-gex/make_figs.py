@@ -228,9 +228,34 @@ a3.set_title("③ Gamma＝加速度：賣方一直是負的，買方一直是正
 a3.set_xlabel("指數（瞬間移動，時間沒有經過；虛線＝K，點線＝19,900 與上下 1,000 點）")
 a3.set_xlim(18_000, 22_000)
 thousands(a3)
-fig.suptitle("圖 5　賣出 put（K＝20,000、剩 30 天）：損益、Delta、Gamma 放在同一條橫軸",
+fig.suptitle("圖 6　賣出 put（K＝20,000、剩 30 天）：損益、Delta、Gamma 放在同一條橫軸",
              x=0.01, ha="left", color=INK)
-save(fig, "fig05_short_put.png")
+save(fig, "fig06_short_put.png")
+
+# 圖9：賣出一口剩 30 天價平 call、做好 Delta 避險後，一天的損益＝Theta − ½ × Gamma × 漲跌²
+T9 = 30 / 365
+th9 = S0 * VOL * norm.pdf(0.5 * VOL * np.sqrt(T9)) / (2 * np.sqrt(T9)) / 365   # 每天的 Theta（點）
+g9 = bs_gamma(S0, S0, 30)                                                       # 每點的 Gamma
+be = np.sqrt(2 * th9 / g9)
+mv = np.linspace(-500, 500, 401)
+pl9 = th9 - 0.5 * g9 * mv**2
+fig, ax = plt.subplots(figsize=(7, 3.9))
+ax.axhline(0, color=INK2, lw=0.8)
+ax.fill_between(mv, pl9, 0, where=pl9 >= 0, color=BLUE, alpha=0.18, lw=0)
+ax.fill_between(mv, pl9, 0, where=pl9 < 0, color=ORANGE, alpha=0.18, lw=0)
+ax.plot(mv, pl9, color=INK, lw=2.2)
+for x in (-be, be):
+    ax.axvline(x, color=GRAY, lw=1, ls=":")
+    ax.plot([x], [0], "o", color=INK, ms=6, zorder=5)
+ax.text(be + 15, 2.5, f"±{be:.0f} 點：損益兩平\n≈ 剩 1 天的散開範圍（第 1.2 節）", color=INK, fontsize=10)
+ax.text(0, th9 + 1.2, f"指數沒動：賺一天的 Theta 約 {th9:.1f} 點", ha="center", color=BLUE, fontsize=10)
+ax.text(-480, -9, "動得比預期大：\n避險虧損超過 Theta", color=ORANGE, fontsize=10)
+ax.set_ylim(-17, 11)
+ax.set_xlabel("當天指數漲跌（點）")
+ax.set_ylabel("賣方當天損益（點／口）")
+ax.set_title("圖 9　賣方一天的帳：Theta 收入 − ½ × Gamma × 漲跌²", loc="left", color=INK)
+save(fig, "fig09_breakeven.png")
+print("breakeven", round(th9, 2), g9, round(be, 1))
 
 # 圖6：Delta＝速度、Gamma＝加速度；賣方／買方四條 Delta 線（K＝20,000、剩 30 天）
 k6, days6 = 20_000, 30
@@ -272,7 +297,7 @@ for ax, title, way, lines in panels:
     ax.set_ylim(-105, 105)
     thousands(ax)
 axes[0].set_ylabel("Delta＝速度（每漲 1 點賺賠幾點，%）")
-fig.suptitle("圖 6　Delta＝線的高度（速度），Gamma＝線的斜率（加速度）",
+fig.suptitle("圖 7　Delta＝線的高度（速度），Gamma＝線的斜率（加速度）",
              x=0.01, ha="left", color=INK)
 fig.text(0.01, 0.915, "藍底：Delta 為正（多頭，漲會賺）　橘底：Delta 為負（空頭，漲會賠）　正負號看高度，Gamma 看斜率", color=INK2, fontsize=10)
 for ax, name, y, lab, ty in ((axes[0], "賣 put", 1 - p_above6(xs6), "斜率＝Gamma\n往下斜＝負", 62), (axes[1], "買 call", p_above6(xs6), "斜率＝Gamma\n往上斜＝正", 40)):
@@ -281,33 +306,33 @@ for ax, name, y, lab, ty in ((axes[0], "賣 put", 1 - p_above6(xs6), "斜率＝G
                 arrowprops=dict(arrowstyle="-|>", color=INK, lw=1.6, shrinkA=6, shrinkB=6))
     ax.text(21_050, ty, lab, color=INK, fontsize=10, va="center")
 fig.tight_layout(rect=(0, 0.02, 1, 0.92))
-fig.savefig(OUT / "fig06_delta_speed.png", dpi=200, bbox_inches="tight", pad_inches=0.15)
+fig.savefig(OUT / "fig07_delta_speed.png", dpi=200, bbox_inches="tight", pad_inches=0.15)
 plt.close(fig)
 
 # 圖4：Gamma 對履約價（左：到期時間；右：波動率）
 ks = np.linspace(18_500, 21_500, 601)
 fig, (a1, a2) = plt.subplots(1, 2, figsize=(9, 3.8), sharey=False)
 for days, c in [(30, BLUE), (7, ORANGE), (1, AQUA)]:
-    g = bs_gamma(S0, ks, days) * 1_000
+    g = bs_gamma(S0, ks, days) * 10_000
     a1.plot(ks, g, color=c, lw=2)
-    lx, tx, ty = {30: (21_200, 20_950, 0.42), 7: (20_300, 20_750, 0.85), 1: (20_080, 20_300, 1.8)}[days]
-    a1.annotate(f"剩 {days} 天", xy=(lx, bs_gamma(S0, lx, days) * 1_000), xytext=(tx, ty), color=c,
+    lx, tx, ty = {30: (21_200, 20_950, 4.2), 7: (20_300, 20_750, 8.5), 1: (20_080, 20_300, 18)}[days]
+    a1.annotate(f"剩 {days} 天", xy=(lx, bs_gamma(S0, lx, days) * 10_000), xytext=(tx, ty), color=c,
                 arrowprops=dict(arrowstyle="-", color=c, lw=0.8))
 a1.set_title("性質 2：越接近到期，越尖", loc="left", color=INK)
 for vol, c in [(0.15, BLUE), (0.30, ORANGE)]:
-    g = bs_gamma(S0, ks, 7, vol) * 1_000
+    g = bs_gamma(S0, ks, 7, vol) * 10_000
     a2.plot(ks, g, color=c, lw=2)
-    lx, tx, ty = {0.15: (20_250, 20_500, 0.9), 0.30: (21_000, 20_900, 0.5)}[vol]
-    a2.annotate(f"波動 {vol:.0%}", xy=(lx, bs_gamma(S0, lx, 7, vol) * 1_000), xytext=(tx, ty), color=c,
+    lx, tx, ty = {0.15: (20_250, 20_500, 9), 0.30: (21_000, 20_900, 5)}[vol]
+    a2.annotate(f"波動 {vol:.0%}", xy=(lx, bs_gamma(S0, lx, 7, vol) * 10_000), xytext=(tx, ty), color=c,
                 arrowprops=dict(arrowstyle="-", color=c, lw=0.8))
 a2.set_title("性質 3：波動越高，越平（剩 7 天）", loc="left", color=INK)
 for a in (a1, a2):
     a.axvline(S0, color=GRAY, lw=1, ls=":")
-    a.set_xlabel("履約價（現價 20,000）")
+    a.set_xlabel("履約價（現價固定在 20,000，換不同履約價）")
     thousands(a)
-a1.set_ylabel("Gamma（每 1,000 點 Delta 變多少）")
-fig.suptitle("圖 7　每個履約價的 Gamma：以現價為中心的一個鼓包", x=0.01, ha="left", color=INK)
-save(fig, "fig07_gamma_by_strike.png")
+a1.set_ylabel("Gamma（每 100 點，Delta 變幾個百分點）")
+fig.suptitle("圖 5　每個履約價的 Gamma：以現價為中心的一個鼓包", x=0.01, ha="left", color=INK)
+save(fig, "fig05_gamma_by_strike.png")
 
 # 圖5：負 Gamma 避險虧損＝三角形面積
 fig, ax = plt.subplots(figsize=(7, 3.6))
@@ -353,10 +378,10 @@ a1.bar(ks, [chain[k][0] for k in ks], width=140, color=BLUE)
 a1.bar(ks, [-chain[k][1] for k in ks], width=140, color=ORANGE)
 a1.axhline(0, color=INK2, lw=0.8)
 from matplotlib.patches import Patch
-a1.legend(handles=[Patch(color=BLUE, label="call 未平倉：造市商買進（＋Gamma）"),
-                   Patch(color=ORANGE, label="put 未平倉：造市商賣出（－Gamma）")],
+a1.legend(handles=[Patch(color=BLUE, label="call：造市商淨買進（＋Gamma）"),
+                   Patch(color=ORANGE, label="put：造市商淨賣出（－Gamma）")],
           loc="upper left", frameon=False, fontsize=10)
-a1.set_ylabel("未平倉（口）")
+a1.set_ylabel("造市商淨部位（假設，口）")
 a1.set_ylim(-6_800, 9_000)
 a1.set_title("假設的選擇權鏈（剩 7 天）", loc="left", color=INK, fontsize=11)
 xs9 = np.arange(19_000, 21_001, 20)
@@ -372,28 +397,39 @@ a2.text(20_980, 650, "GEX 為正：漲了賣、跌了買\n（避險單逆著價�
 a2.text(19_020, -150, "GEX 為負：漲了買、跌了賣\n（避險單順著價格，放大波動）", va="top", color=ORANGE, fontsize=10)
 a2.set_ylim(-1_700, 1_800)
 a2.set_ylabel("GEX（每 1% 要買賣的小台口數）")
-a2.set_xlabel("指數")
+a2.set_xlabel("假想指數移到這個位置（未平倉、IV、剩餘天數都不變）")
 thousands(a2)
-fig.suptitle("圖 9　把每個履約價的 Gamma 加起來：指數在哪裡，造市商的避險單就往哪個方向推", x=0.01, ha="left", color=INK)
-save(fig, "fig09_gex_curve.png")
+fig.suptitle("圖 10　把每個履約價的 Gamma 加起來：指數在哪裡，造市商的避險單就往哪個方向推", x=0.01, ha="left", color=INK)
+save(fig, "fig10_gex_curve.png")
 
 # 圖10：三大法人選擇權淨未平倉（真實資料，2026-07～09）
 io = pd.read_csv(DATA / "txo_institutional_oi_2026Q3.csv", parse_dates=["date"])
 fig, axes = plt.subplots(1, 2, figsize=(10, 3.9), sharey=True)
 for ax, cp in zip(axes, ("買權", "賣權")):
-    for who, c in (("自營商", BLUE), ("外資", ORANGE), ("投信", AQUA)):
-        s = io[(io.call_put == cp) & (io.institutional_investors == who)].set_index("date").net
-        ax.plot(s.index, s.values, color=c, lw=1.8, label=who)
-        ax.text(s.index[-1], s.values[-1], f" {who}", color=c, fontsize=10, va="center")
+    ends = []
+    for who, c in (("自營商", BLUE), ("外資", ORANGE), ("投信", AQUA), ("三大法人合計", GRAY)):
+        if who == "三大法人合計":
+            s = io[io.call_put == cp].groupby("date").net.sum()
+            ax.plot(s.index, s.values, color=c, lw=1.4, ls="--")
+        else:
+            s = io[(io.call_put == cp) & (io.institutional_investors == who)].set_index("date").net
+            ax.plot(s.index, s.values, color=c, lw=1.8)
+        ends.append([float(s.values[-1]), who, c, s.index[-1]])
+    ends.sort(key=lambda e: e[0])
+    for i in range(1, len(ends)):  # 標籤太近就往上推
+        if ends[i][0] - ends[i - 1][0] < 1_700:
+            ends[i][0] = ends[i - 1][0] + 1_700
+    for y, who, c, x in ends:
+        ax.text(x, y, f" {who}", color=c, fontsize=9.5, va="center")
     ax.axhline(0, color=INK2, lw=0.8)
     ax.set_title(f"{'call' if cp == '買權' else 'put'}：淨未平倉（買方 − 賣方，口）", loc="left", color=INK, fontsize=11)
     ax.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%m/%d"))
     thousands(ax, "y")
-axes[0].text(0.02, 0.04, "0 以上＝淨買進（持有＋Gamma）\n0 以下＝淨賣出（持有－Gamma）", transform=axes[0].transAxes, color=INK2, fontsize=9)
-fig.suptitle("圖 10　臺指選擇權三大法人淨部位（2026/7–9/30）：自營商大多是淨買進，不是淨賣出", x=0.01, ha="left", color=INK)
-fig.tight_layout()
-fig.subplots_adjust(right=0.94)
-fig.savefig(OUT / "fig10_institutional.png", dpi=200)
+fig.text(0.01, 0.885, "0 以上＝淨買進、0 以下＝淨賣出（口數，不等於 Gamma，見第 5.3 節）", color=INK2, fontsize=9.5)
+fig.suptitle("圖 11　臺指選擇權三大法人淨部位（2026/7–9/30）：自營商大多是淨買進，不是淨賣出", x=0.01, ha="left", color=INK)
+fig.tight_layout(rect=(0, 0, 1, 0.9))
+fig.subplots_adjust(right=0.88)
+fig.savefig(OUT / "fig11_institutional.png", dpi=200)
 plt.close(fig)
 
 # 圖11：價格不動，避險量也會變（charm：時間；vanna：IV）
@@ -410,9 +446,9 @@ for d in (30, 7, 1):
 ax.invert_xaxis()
 ax.set_xlabel("剩餘天數（指數一直停在 20,000）")
 ax.set_ylabel("造市商需要放空的小台（口）")
-ax.set_title("圖 11　賣出 1,000 口 19,500 put：價格沒動，避險量也會自己變小", loc="left", color=INK)
+ax.set_title("圖 12　賣出 1,000 口 19,500 put：價格沒動，避險量也會自己變小", loc="left", color=INK)
 ax.set_ylim(0, 420)
-save(fig, "fig11_charm_vanna.png")
+save(fig, "fig12_charm_vanna.png")
 
 # 圖12：真實 9/30 收盤的 Gamma 分布與規模（真實資料）
 gb = pd.read_csv(DATA / "txo_gamma_by_strike_20260930.csv")
@@ -424,11 +460,11 @@ a1.bar(gb.strike, -gb.put_gamma_1pct, width=80, color=ORANGE)
 a1.axhline(0, color=INK2, lw=0.8)
 a1.axvline(47_940, color=INK2, lw=1, ls="--")
 a1.text(47_850, a1.get_ylim()[1] * 0.93, "加權指數 47,940", color=INK2, fontsize=10, ha="right")
-a1.text(42_100, a1.get_ylim()[1] * 0.75, "call 的 Gamma", color=BLUE, fontsize=10)
-a1.text(42_100, a1.get_ylim()[0] * 0.8, "put 的 Gamma", color=ORANGE, fontsize=10)
+a1.text(42_100, a1.get_ylim()[1] * 0.75, "call（記正）", color=BLUE, fontsize=10)
+a1.text(42_100, a1.get_ylim()[0] * 0.8, "put（記負）", color=ORANGE, fontsize=10)
 a1.set_xlabel("履約價")
 a1.set_ylabel("每 1% 對應的小台口數")
-a1.set_title("每個履約價的 Gamma（所有到期合計）", loc="left", color=INK, fontsize=11)
+a1.set_title("每個履約價的 Gamma（依美股慣例給正負號：call 記正、put 記負）", loc="left", color=INK, fontsize=10)
 thousands(a1)
 shifts = np.linspace(-0.06, 0.04, 41)
 conv = []
@@ -445,9 +481,9 @@ a2.set_xlabel("指數相對 9/30 收盤變動（%）")
 a2.set_ylabel("慣例假設下的 GEX（小台口數）")
 a2.set_title("若照美股慣例假設對手方", loc="left", color=INK, fontsize=11)
 thousands(a2, "y")
-fig.suptitle("圖 12　真實資料（2026/9/30 收盤）：全部 Gamma 合計每 1% 約 5,400 口小台，日盤期貨成交約 30 萬口",
+fig.suptitle("圖 13　真實資料（2026/9/30 收盤）：全部 Gamma 合計每 1% 約 5,400 口小台，日盤期貨成交約 30 萬口",
              x=0.01, ha="left", color=INK)
 fig.tight_layout()
-fig.savefig(OUT / "fig12_real_gamma.png", dpi=200)
+fig.savefig(OUT / "fig13_real_gamma.png", dpi=200)
 plt.close(fig)
 print("done 9-12")
