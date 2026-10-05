@@ -432,6 +432,28 @@ fig.subplots_adjust(right=0.88)
 fig.savefig(OUT / "fig11_institutional.png", dpi=200)
 plt.close(fig)
 
+# 圖12：週選 call 的賣方集中度（大額交易人結構表，真實資料 2025-07～2026-09）
+lt = pd.read_csv(DATA / "txo_large_traders_weekly_2025_2026.csv", parse_dates=["date"])
+lt["m"] = lt.date.dt.to_period("M").dt.to_timestamp()
+fig, ax = plt.subplots(figsize=(8.6, 3.9))
+for cp, col, nm, c, ls in (("call", "sell_top5_trader_open_interest_per", "週選 call：前 5 大賣方", ORANGE, "-"),
+                           ("call", "buy_top5_trader_open_interest_per", "週選 call：前 5 大買方", BLUE, "-"),
+                           ("put", "sell_top5_trader_open_interest_per", "週選 put：前 5 大賣方", ORANGE, ":")):
+    s = lt[lt.put_call == cp].groupby("m")[col].median()
+    ax.plot(s.index, s.values, color=c, lw=2, ls=ls)
+    ax.text(s.index[-1], s.values[-1], f"  {nm} {s.values[-1]:.0f}%", color=c, fontsize=9.5, va="center")
+sp = lt[lt.put_call == "call"].assign(x=lambda d: 100 * d.sell_top10_specific_open_interest / d.market_open_interest).groupby("m").x.median()
+ax.plot(sp.index, sp.values, color=GRAY, lw=1.6, ls="--")
+ax.text(sp.index[-1], sp.values[-1] + 2, f"  其中屬於特定法人 {sp.values[-1]:.0f}%", color=GRAY, fontsize=9.5, va="bottom")
+ax.set_ylim(0, 75)
+ax.set_ylabel("佔該類未平倉（%，月中位數）")
+ax.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%y/%m"))
+ax.set_title("圖 12　週選 call 越來越集中在少數賣方手上，而且他們幾乎都不是「特定法人」", loc="left", color=INK)
+fig.tight_layout()
+fig.subplots_adjust(right=0.74)
+fig.savefig(OUT / "fig12_weekly_sellers.png", dpi=200)
+plt.close(fig)
+
 # 圖11：價格不動，避險量也會變（charm：時間；vanna：IV）
 dd = np.linspace(30, 0.2, 300)
 fig, ax = plt.subplots(figsize=(7, 3.9))
@@ -446,9 +468,9 @@ for d in (30, 7, 1):
 ax.invert_xaxis()
 ax.set_xlabel("剩餘天數（指數一直停在 20,000）")
 ax.set_ylabel("造市商需要放空的小台（口）")
-ax.set_title("圖 12　賣出 1,000 口 19,500 put：價格沒動，避險量也會自己變小", loc="left", color=INK)
+ax.set_title("圖 13　賣出 1,000 口 19,500 put：價格沒動，避險量也會自己變小", loc="left", color=INK)
 ax.set_ylim(0, 420)
-save(fig, "fig12_charm_vanna.png")
+save(fig, "fig13_charm_vanna.png")
 
 # 圖12：真實 9/30 收盤的 Gamma 分布與規模（真實資料）
 gb = pd.read_csv(DATA / "txo_gamma_by_strike_20260930.csv")
@@ -481,9 +503,48 @@ a2.set_xlabel("指數相對 9/30 收盤變動（%）")
 a2.set_ylabel("慣例假設下的 GEX（小台口數）")
 a2.set_title("若照美股慣例假設對手方", loc="left", color=INK, fontsize=11)
 thousands(a2, "y")
-fig.suptitle("圖 13　真實資料（2026/9/30 收盤）：全部 Gamma 合計每 1% 約 5,400 口小台，日盤期貨成交約 30 萬口",
+fig.suptitle("圖 14　真實資料（2026/9/30 收盤）：全部 Gamma 合計每 1% 約 5,400 口小台，日盤期貨成交約 30 萬口",
              x=0.01, ha="left", color=INK)
 fig.tight_layout()
-fig.savefig(OUT / "fig13_real_gamma.png", dpi=200)
+fig.savefig(OUT / "fig14_real_gamma.png", dpi=200)
 plt.close(fig)
 print("done 9-12")
+
+# 圖15：Gamma 總量是 IV 的鏡子（真實資料 2025-07～2026-09，285 天）
+gi = pd.read_csv(DATA / "txo_daily_gamma_iv_2025_2026.csv")
+from scipy.stats import spearmanr  # noqa: E402
+fig, (a1, a2) = plt.subplots(1, 2, figsize=(10, 4.0), gridspec_kw={"width_ratios": [1.15, 1]})
+a1.scatter(100 * (np.exp(gi.iv_month_rel) - 1), 100 * (np.exp(gi.g_rel) - 1), s=12, color=BLUE, alpha=0.6, lw=0)
+a1.axhline(0, color=INK2, lw=0.8)
+a1.axvline(0, color=INK2, lw=0.8)
+rho = spearmanr(gi.iv_month_rel, gi.g_rel)[0]
+a1.text(0.97, 0.95, f"相關 {rho:+.2f}", transform=a1.transAxes, ha="right", va="top", color=INK, fontsize=11)
+a1.set_xlabel("IV 比過去 20 天中位數高多少（%）")
+a1.set_ylabel("全部 Gamma 比過去 20 天中位數多多少（%）")
+a1.set_title("IV 比平常低的日子，Gamma 就比平常多", loc="left", color=INK, fontsize=11)
+wd = pd.get_dummies(gi.wd1, drop_first=True).values.astype(float)
+
+
+def partial(x, extra):
+    X = np.column_stack([np.ones(len(gi)), gi[["r5", "r20", "rv"] + extra].values, wd])
+    r = lambda y: y - X @ np.linalg.lstsq(X, y, rcond=None)[0]
+    return spearmanr(r(gi[x].values), r(gi.logR.values))[0]
+
+
+bars = [("Gamma 比平常多\n（只扣 IV 的水位）", partial("g_rel", ["iv_month", "iv_near"]), BLUE),
+        ("Gamma 比平常多\n（扣掉 IV 比平常高低）", partial("g_rel", ["iv_month_rel", "iv_near_rel"]), BLUE),
+        ("IV 比平常高", partial("iv_month_rel", []), ORANGE)]
+for i, (lab, v, c) in enumerate(bars):
+    a2.bar(i, v, color=c, width=0.6)
+    a2.text(i, v + (0.012 if v > 0 else -0.012), f"{v:+.2f}", ha="center", va="bottom" if v > 0 else "top", color=INK, fontsize=10.5)
+a2.set_xticks(range(3))
+a2.set_xticklabels([b[0] for b in bars], fontsize=9.5)
+a2.axhline(0, color=INK2, lw=0.8)
+a2.set_ylim(-0.32, 0.36)
+a2.set_ylabel("和「隔天振幅比平常大」的相關")
+a2.set_title("扣掉 IV 之後，Gamma 幾乎不剩資訊", loc="left", color=INK, fontsize=11)
+fig.suptitle("圖 15　真實資料（2025/7–2026/9，285 天）：Gamma 總量大半是 IV 的鏡子", x=0.01, ha="left", color=INK)
+fig.tight_layout()
+fig.savefig(OUT / "fig15_gamma_iv_mirror.png", dpi=200)
+plt.close(fig)
+print("done 12-15")
